@@ -31,6 +31,16 @@ from risk_engine.var import var_table
 REPORTS = Path(__file__).parent / "reports"
 
 
+def _fmt(df: pd.DataFrame, formats: dict[str, str], default: str = "{:,.0f}") -> str:
+    """Plain-text table with a number format per column (used for reports/summary.md)."""
+    out = df.copy().astype(object)
+    for col in df.columns:
+        f = formats.get(col, default)
+        out[col] = [f.format(v) if isinstance(v, (int, float, np.number)) and not isinstance(v, bool) else v
+                    for v in df[col]]
+    return out.to_string()
+
+
 def main() -> None:
     p = argparse.ArgumentParser(description="Portfolio Risk Engine report")
     p.add_argument("--tickers", nargs="+", default=["SPY", "TLT", "GLD", "EFA", "QQQ"])
@@ -154,14 +164,14 @@ def main() -> None:
     data_note = "SIMULATED prices (demo mode)" if args.demo else f"Yahoo Finance prices from {prices.index[0].date()} to {prices.index[-1].date()}"
     (REPORTS / "summary.md").write_text(
         f"# Risk report\n\nPortfolio: {', '.join(f'{t} {w:.0%}' for t, w in port.weights.items())}\n\nData: {data_note}\n\n"
-        f"## 1-day VaR / ES (portfolio value {args.value:,.0f})\n\n```\n{vt.round(0).to_string()}\n```\n\n"
+        f"## 1-day VaR / ES (portfolio value {args.value:,.0f})\n\n```\n{_fmt(vt, {})}\n```\n\n"
         f"## GARCH(1,1)\n\nalpha {g.alpha:.3f}, beta {g.beta:.3f}, persistence {g.persistence:.3f}, "
         f"half-life {g.half_life_days:.0f} days\n\n"
         f"GJR-GARCH: alpha {gj.alpha:.3f}, gamma {gj.gamma:.3f}, beta {gj.beta:.3f}; "
         f"AIC {gj.aic:,.1f} vs {g.aic:,.1f} for GARCH\n\n"
-        f"## Backtest, 99% VaR\n\n```\n{bt_table.to_string()}\n```\n\n"
-        f"## ES backtest, 97.5% (Z2)\n\n```\n{z_table.to_string()}\n```\n\n"
-        f"## Historical stress\n\n```\n{hs.to_string() if not hs.empty else 'not covered by data'}\n```\n")
+        f"## Backtest, 99% VaR\n\n```\n{_fmt(bt_table, {"expected": "{:.1f}", "kupiec_p": "{:.4f}", "independence_p": "{:.4f}", "cond_coverage_p": "{:.4f}"})}\n```\n\n"
+        f"## ES backtest, 97.5% (Z2)\n\n```\n{_fmt(z_table, {"Z2": "{:.3f}", "expected": "{:.1f}"})}\n```\n\n"
+        f"## Historical stress\n\n```\n{_fmt(hs, {"portfolio_return": "{:.1%}", "max_drawdown_in_window": "{:.1%}"}) if not hs.empty else 'not covered by data'}\n```\n")
     vt.round(2).to_csv(REPORTS / "var_table.csv")
     bt_table.to_csv(REPORTS / "backtest.csv")
     print(f"\nCharts and tables saved to {REPORTS}/")
