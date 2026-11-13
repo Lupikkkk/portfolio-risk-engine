@@ -115,10 +115,10 @@ def es_backtest_z2(returns: pd.Series, var: pd.Series, es: pd.Series, alpha: flo
             "reject_5pct": z2 < -0.7}
 
 
-def backtest_report(returns: pd.Series, alpha: float = 0.99, window: int = 250,
-                    fhs_window: int = 750, include_fhs: bool = True) -> pd.DataFrame:
-    """Compare methods on the same out-of-sample period (all start after ``fhs_window`` days
-    when FHS is included, so the comparison is like for like)."""
+def backtest_runs(returns: pd.Series, alpha: float = 0.99, window: int = 250,
+                  fhs_window: int = 750, include_fhs: bool = True) -> dict[str, pd.DataFrame]:
+    """Out-of-sample forecasts of every method on the same period (all start after
+    ``fhs_window`` days when FHS is included, so the comparison is like for like)."""
     from .garch import rolling_fhs
 
     runs = {m: rolling_var(returns, alpha, window, m) for m in ("historical", "normal", "t")}
@@ -127,15 +127,27 @@ def backtest_report(returns: pd.Series, alpha: float = 0.99, window: int = 250,
         runs["fhs_gjr"] = rolling_fhs(returns, alpha, fhs_window, model="gjr")
         start = runs["fhs_garch"].index[0]
         runs = {m: bt.loc[start:] for m, bt in runs.items()}
+    return runs
+
+
+def backtest_report(returns: pd.Series, alpha: float = 0.99, window: int = 250,
+                    fhs_window: int = 750, include_fhs: bool = True,
+                    years: tuple[int, ...] = (2008,),
+                    runs: dict[str, pd.DataFrame] | None = None) -> pd.DataFrame:
+    """Coverage tests per method, with exception counts for selected calendar ``years``.
+    Pass ``runs`` from :func:`backtest_runs` to avoid re-estimating the models."""
+    runs = runs or backtest_runs(returns, alpha, window, fhs_window, include_fhs)
     rows = {}
     for method, bt in runs.items():
         k = kupiec_pof(bt["exception"], alpha)
         c = christoffersen_independence(bt["exception"])
         cc = conditional_coverage(bt["exception"], alpha)
         last = int(bt["exception"].iloc[-250:].sum())
+        by_year = bt["exception"].groupby(bt.index.year).sum()
         rows[method] = {
             "exceptions": k["exceptions"],
             "expected": round(k["expected"], 1),
+            **{f"exceptions_{y}": int(by_year.get(y, 0)) for y in years if y in by_year.index},
             "kupiec_p": round(k["p_value"], 4),
             "independence_p": round(c["p_value"], 4),
             "cond_coverage_p": round(cc["p_value"], 4),

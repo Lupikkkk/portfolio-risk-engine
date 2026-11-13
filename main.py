@@ -23,7 +23,7 @@ import pandas as pd
 from scipy.stats import chi2
 
 from risk_engine import Portfolio, load_prices, simulate_prices, to_returns
-from risk_engine.backtest import backtest_report, es_backtest_z2, rolling_var
+from risk_engine.backtest import backtest_report, backtest_runs, es_backtest_z2, rolling_var
 from risk_engine.garch import fit_garch, rolling_fhs
 from risk_engine.stress import run_historical_stress, run_hypothetical_shock
 from risk_engine.var import var_table
@@ -96,7 +96,8 @@ def main() -> None:
 
     print("\n=== Backtest 99% VaR, same out-of-sample period for all methods ===")
     print("(historical / normal / t: 250-day window; FHS-GARCH / FHS-GJR: 750-day window, refit every 20 days)")
-    bt_table = backtest_report(pr, 0.99, 250)
+    runs = backtest_runs(pr, 0.99, 250)
+    bt_table = backtest_report(pr, 0.99, 250, runs=runs)
     print(bt_table)
 
     print("\n=== Expected Shortfall backtest (97.5%, Acerbi-Szekely Z2; reject if Z2 < -0.7) ===")
@@ -129,8 +130,7 @@ def main() -> None:
         "axes.titlelocation": "left", "grid.color": stone, "grid.alpha": 0.25, "grid.linewidth": 0.6,
     })
 
-    fhs = rolling_fhs(pr, 0.99, 750, model="gjr")  # best model in the backtest
-    bt = rolling_var(pr, 0.99, 250, "historical").loc[fhs.index[0]:]
+    fhs, bt = runs["fhs_gjr"], runs["historical"]  # GJR has the least clustered exceptions
     fig, ax = plt.subplots(figsize=(11, 4.5))
     ax.plot(bt.index, bt["return"] * 100, lw=0.5, color=stone, label="Daily return")
     ax.plot(bt.index, -bt["var"] * 100, lw=1.3, color=navy,
@@ -162,22 +162,54 @@ def main() -> None:
     fig.savefig(REPORTS / "risk_contribution.png", dpi=150)
 
     data_note = "SIMULATED prices (demo mode)" if args.demo else f"Yahoo Finance prices from {prices.index[0].date()} to {prices.index[-1].date()}"
+    # Numbers quoted in the README, written out so each one can be checked
+    oos = runs["historical"].index
+    lr_gjr = 2 * (gj.loglik - g.loglik)
+    last250 = oos[-250:]
+    exc_rows = [{"date": d.date(), "method": m, "return": r.loc[d, "return"], "var": r.loc[d, "var"]}
+                for m, r in runs.items() for d in r.index[r["exception"]]]
+    exceptions = pd.DataFrame(exc_rows).sort_values(["method", "date"])
+    last_exc = "\n".join(
+        f"{m:<11} {len(d):>2}: " + ", ".join(str(x) for x in d)
+        for m in runs for d in [[x.date() for x in runs[m].index[runs[m]["exception"]] if x >= last250[0]]])
+    hist_win = pr.loc[:last250[0]].iloc[-251:-1]  # data behind historical VaR on the first of the 250 days
+    worst_day = hist_win.idxmin()
+    leaves = pr.index[pr.index.get_loc(worst_day) + 250].date()
+    rv = lambda n: pr.iloc[-n:].std() * np.sqrt(252)
+    big = pr.iloc[-20:][pr.iloc[-20:].abs() >= 0.015]
     vt_txt = _fmt(vt, {})
+    cv_txt = _fmt(cv, {"weight": "{:.0%}", "pct_of_total": "{:.1%}"})
     bt_txt = _fmt(bt_table, {"expected": "{:.1f}", "kupiec_p": "{:.4f}", "independence_p": "{:.4f}",
                              "cond_coverage_p": "{:.4f}"})
     z_txt = _fmt(z_table, {"Z2": "{:.3f}", "expected": "{:.1f}"})
     hs_txt = (_fmt(hs, {"portfolio_return": "{:.1%}", "max_drawdown_in_window": "{:.1%}"})
               if not hs.empty else "not covered by data")
+    hist_var, fhs_var_now = vt.loc["VaR 99%", "Historical"], vt.loc["VaR 99%", "FHS-GARCH (conditional)"]
     (REPORTS / "summary.md").write_text(
         f"# Risk report\n\nPortfolio: {', '.join(f'{t} {w:.0%}' for t, w in port.weights.items())}\n\nData: {data_note}\n\n"
         f"## 1-day VaR / ES (portfolio value {args.value:,.0f})\n\n```\n{vt_txt}\n```\n\n"
+        f"FHS-GARCH 99% VaR is {fhs_var_now / hist_var - 1:+.0%} relative to historical VaR.\n\n"
+        f"## Risk contribution (parametric 99% VaR, Euler)\n\n```\n{cv_txt}\n```\n\n"
         f"## GARCH(1,1)\n\nalpha {g.alpha:.3f}, beta {g.beta:.3f}, persistence {g.persistence:.3f}, "
         f"half-life {g.half_life_days:.0f} days\n\n"
         f"GJR-GARCH: alpha {gj.alpha:.3f}, gamma {gj.gamma:.3f}, beta {gj.beta:.3f}; "
-        f"AIC {gj.aic:,.1f} vs {g.aic:,.1f} for GARCH\n\n"
-        f"## Backtest, 99% VaR\n\n```\n{bt_txt}\n```\n\n"
+        f"AIC {gj.aic:,.1f} vs {g.aic:,.1f} for GARCH; LR = {lr_gjr:.1f} "
+        f"(5% critical value {chi2.ppf(0.95, 1):.2f})\n\n"
+        f"## Backtest, 99% VaR\n\nOut-of-sample period: {oos[0].date()} to {oos[-1].date()}, {len(oos):,} days. "
+        f"All exception dates: [exceptions.csv](exceptions.csv).\n\n```\n{bt_txt}\n```\n\n"
+        f"### Last 250 days ({last250[0].date()} to {last250[-1].date()})\n\n"
+        f"Exception dates:\n\n```\n{last_exc}\n```\n\n"
+        f"Largest loss in the 250-day window behind historical VaR on {last250[0].date()}: "
+        f"{pr.loc[worst_day]:.2%} on {worst_day.date()}; it leaves the window after {leaves}.\n\n"
         f"## ES backtest, 97.5% (Z2)\n\n```\n{z_txt}\n```\n\n"
+        f"## Current volatility\n\nRealised volatility (annualised): last 20 days {rv(20):.1%}, "
+        f"last 250 days {rv(250):.1%}. GARCH forecast for tomorrow {g.next_sigma * 252 ** 0.5:.1%}, "
+        f"GJR-GARCH {gj.next_sigma * 252 ** 0.5:.1%}.\n\n"
+        f"Daily moves of 1.5% or more in the last 20 days: "
+        f"{', '.join(f'{d.date()} {r:+.2%}' for d, r in big.items()) or 'none'}.\n\n"
         f"## Historical stress\n\n```\n{hs_txt}\n```\n")
+    exceptions.to_csv(REPORTS / "exceptions.csv", index=False, float_format="%.6f")
+    cv.to_csv(REPORTS / "risk_contribution.csv")
     vt.round(2).to_csv(REPORTS / "var_table.csv")
     bt_table.to_csv(REPORTS / "backtest.csv")
     print(f"\nCharts and tables saved to {REPORTS}/")
