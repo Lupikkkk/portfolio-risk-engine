@@ -45,7 +45,7 @@ def main() -> None:
     p = argparse.ArgumentParser(description="Portfolio Risk Engine report")
     p.add_argument("--tickers", nargs="+", default=["SPY", "TLT", "GLD", "EFA", "QQQ"])
     p.add_argument("--weights", nargs="+", type=float, default=None)
-    p.add_argument("--start", default="2007-01-01")
+    p.add_argument("--start", default="2005-01-01")
     p.add_argument("--value", type=float, default=1_000_000)
     p.add_argument("--csv", default=None, help="Local CSV of prices instead of downloading")
     p.add_argument("--demo", action="store_true", help="Use simulated data (offline)")

@@ -19,37 +19,44 @@ The GARCH and GJR-GARCH models are implemented from scratch (likelihood, constra
 
 **Does a risk model that reacts to volatility beat plain historical simulation?**
 
-Historical VaR weights the last 250 days equally, so it is slow to rise when a crisis starts and slow to fall afterwards. Its exceptions therefore arrive in clusters. A model can have the right number of exceptions over ten years and still fail when it matters. Filtered Historical Simulation fixes this: it divides returns by their GARCH volatility, takes the quantile of the standardised residuals (which keeps fat tails), and scales by tomorrow's volatility forecast.
+Historical VaR weights the last 250 days equally, so it is slow to rise when a crisis starts and slow to fall afterwards. Its exceptions therefore arrive in clusters. A model can have the right number of exceptions over ten years and still fail when it matters. Filtered Historical Simulation is designed to fix this: it divides returns by their GARCH volatility, takes the quantile of the standardised residuals (which keeps fat tails), and scales by tomorrow's volatility forecast.
 
 `python main.py` puts both models through the same out-of-sample period and writes the verdict to [`reports/summary.md`](reports/summary.md): exception counts, p-values of the coverage and independence tests, the Basel zone and the ES backtest.
 
 ## Results
 
-Portfolio: SPY 35%, TLT 25%, GLD 10%, EFA 15%, QQQ 15%. Daily Yahoo Finance prices, January 2007 to November 2026. The out-of-sample backtest runs from January 2010 (after the first 750-day GARCH window), 4,248 days in total, the same period for every method.
+Portfolio: SPY 35%, TLT 25%, GLD 10%, EFA 15%, QQQ 15%. Daily Yahoo Finance prices, January 2005 to November 2026 (GLD starts trading in November 2004). The out-of-sample backtest starts on 27 December 2007, after the first 750-day GARCH window, so **the 2008 crisis is inside the test**. It covers 4,751 days, the same period for every method.
 
-**99% VaR backtest** (42.5 exceptions expected)
+**99% VaR backtest** (47.5 exceptions expected)
 
-| Method | Exceptions | Kupiec p | Independence p | Cond. coverage p |
-|---|---:|---:|---:|---:|
-| Historical simulation | 58 | 0.023 | 0.0001 | 0.0000 |
-| Parametric normal | 88 | 0.000 | 0.0000 | 0.0000 |
-| Parametric Student-t | 62 | 0.005 | 0.0000 | 0.0000 |
-| FHS-GARCH | 54 | 0.088 | 0.005 | 0.005 |
-| **FHS-GJR-GARCH** | **53** | **0.118** | **0.032** | **0.030** |
+| Method | Exceptions | of which in 2008 | Kupiec p | Independence p | Cond. coverage p |
+|---|---:|---:|---:|---:|---:|
+| Historical simulation | 71 | 13 | 0.001 | 0.0001 | 0.000 |
+| Parametric normal | 104 | 16 | 0.000 | 0.0000 | 0.000 |
+| Parametric Student-t | 74 | 12 | 0.000 | 0.0000 | 0.000 |
+| FHS-GARCH | 59 | 4 | **0.106** | 0.0065 | 0.007 |
+| FHS-GJR-GARCH | 63 | 6 | 0.032 | **0.062** | 0.017 |
 
 **97.5% Expected Shortfall backtest** (Acerbi-Szekely Z2, 0 for a correct model, reject below −0.7)
 
-| Method | Z2 | Exceptions (106 expected) |
+| Method | Z2 | Exceptions (119 expected) |
 |---|---:|---:|
-| Historical simulation | −0.35 | 131 |
-| FHS-GARCH | −0.06 | 109 |
-| FHS-GJR-GARCH | −0.07 | 110 |
+| Historical simulation | −0.43 | 155 |
+| FHS-GARCH | −0.11 | 129 |
+| FHS-GJR-GARCH | −0.10 | 127 |
 
-**Verdict.** Volatility filtering works. Both FHS models pass the Kupiec test, and their ES is almost exactly right (Z2 ≈ 0, against −0.35 for historical simulation, which underestimates tail losses). The normal model fails badly: it produces twice the expected number of exceptions. Exception clustering is the harder problem. Plain GARCH(1,1) cuts it a lot (the independence p-value rises from 0.0001 to 0.005), but in March 2020 volatility jumped faster than the model could follow.
+**Verdict.** Volatility filtering clearly beats historical simulation, and 2008 shows it most clearly. Historical VaR had 13 exceptions that year, five times the expected 2.5, because its 250-day window was still full of calm 2007 days. FHS-GARCH had 4. Over the whole period the FHS models cut exceptions from 71 to about 60, and they bring Z2 from −0.43 to −0.10: historical simulation understates the size of tail losses, FHS gets it nearly right. The normal model fails badly, with more than twice the expected number of exceptions.
 
-**Second step: asymmetric volatility.** In equity-heavy portfolios, falls raise volatility more than rallies of the same size (the leverage effect). GJR-GARCH adds a term γ·ε² that applies only after negative returns. On the full sample the asymmetry is strong. The estimates are α = 0.007 and γ = 0.142: almost all the volatility response comes from down days. The likelihood-ratio statistic against plain GARCH is 136 (5% critical value 3.84), and AIC falls by 134. Out of sample, FHS-GJR has the best coverage of all methods (Kupiec p = 0.12), and the independence p-value rises again, from 0.005 to 0.032. It is close to the 5% line but still below it. Some clustering remains. The likely causes are a single-asset volatility model and constant correlations, which a multivariate model (DCC) would address.
+No model passes every test, and the two GARCH variants fail in opposite ways:
 
-Other numbers from the same run: GARCH persistence is 0.984 (volatility shocks have a half-life of 43 days). SPY, QQQ and EFA account for 95% of parametric 99% VaR, while TLT, with a 25% weight, adds only 0.5% because of its low correlation with equities. The worst historical scenario is the 2008 Lehman collapse (−27%), closely followed by the 2022 rates shock (−26%), when bonds fell together with equities. Full output: [`reports/summary.md`](reports/summary.md).
+- **FHS-GARCH** has the right number of exceptions (Kupiec p = 0.11), but they still cluster (independence p = 0.007). In March 2020 volatility jumped faster than the model could follow.
+- **FHS-GJR-GARCH** fixes the clustering (independence p = 0.06). In equity-heavy portfolios falls raise volatility more than rallies of the same size (the leverage effect), and GJR adds a term γ·ε² that applies only after negative returns. The asymmetry is strong. The estimates are α = 0.006 and γ = 0.141, so almost all the volatility response comes from down days. The likelihood-ratio statistic against plain GARCH is 152 (5% critical value 3.84). The cost is too many exceptions overall (63, Kupiec p = 0.03). After calm stretches GJR lets VaR fall further, so sudden drops from low volatility catch it out.
+
+Both results point to the same next step. A univariate model on portfolio returns cannot see correlations move, and a multivariate model (DCC) is the natural extension.
+
+Other numbers from the same run: SPY, QQQ and EFA account for 95% of parametric 99% VaR, while TLT, with a 25% weight, adds less than 1% because of its low correlation with equities. The worst historical scenario is the 2008 Lehman collapse (−27%), closely followed by the 2022 rates shock (−26%), when bonds fell together with equities. Full output: [`reports/summary.md`](reports/summary.md).
+
+![Risk contribution](reports/risk_contribution.png)
 
 ## Quick start
 
@@ -57,7 +64,7 @@ Other numbers from the same run: GARCH persistence is 0.984 (volatility shocks h
 pip install -r requirements.txt
 
 # Full report on real market data (downloads prices from Yahoo Finance)
-python main.py --tickers SPY TLT GLD EFA QQQ --weights 0.35 0.25 0.10 0.15 0.15 --start 2007-01-01
+python main.py --tickers SPY TLT GLD EFA QQQ --weights 0.35 0.25 0.10 0.15 0.15 --start 2005-01-01
 
 python main.py --demo      # offline, simulated fat-tailed prices with volatility clustering
 streamlit run app.py       # interactive dashboard
@@ -78,8 +85,6 @@ main.py          command-line report, charts and reports/summary.md
 app.py           Streamlit dashboard
 tests/           formula checks, parameter recovery, no-look-ahead check, power of the tests
 ```
-
-![Risk contribution](reports/risk_contribution.png)
 
 ## Methodology
 
@@ -104,7 +109,7 @@ Every forecast uses only data available before the forecast day. GARCH parameter
 
 - Weights are constant (rebalanced daily). Options and other non-linear positions would need full revaluation.
 - GARCH and GJR-GARCH are fitted to portfolio returns (univariate). A multivariate model (DCC) would let correlations move in a crisis.
-- Some exception clustering remains even with GJR-GARCH (independence p = 0.03), concentrated in March 2020.
+- No model passes all three coverage tests: FHS-GARCH still clusters exceptions, and FHS-GJR-GARCH has too many of them.
 - The −0.7 threshold for Z2 is the approximation reported by Acerbi and Szekely. A simulated critical value would be more exact.
 
 ---
