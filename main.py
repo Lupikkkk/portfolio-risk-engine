@@ -162,16 +162,22 @@ def main() -> None:
     fig.savefig(REPORTS / "risk_contribution.png", dpi=150)
 
     data_note = "SIMULATED prices (demo mode)" if args.demo else f"Yahoo Finance prices from {prices.index[0].date()} to {prices.index[-1].date()}"
+    vt_txt = _fmt(vt, {})
+    bt_txt = _fmt(bt_table, {"expected": "{:.1f}", "kupiec_p": "{:.4f}", "independence_p": "{:.4f}",
+                             "cond_coverage_p": "{:.4f}"})
+    z_txt = _fmt(z_table, {"Z2": "{:.3f}", "expected": "{:.1f}"})
+    hs_txt = (_fmt(hs, {"portfolio_return": "{:.1%}", "max_drawdown_in_window": "{:.1%}"})
+              if not hs.empty else "not covered by data")
     (REPORTS / "summary.md").write_text(
         f"# Risk report\n\nPortfolio: {', '.join(f'{t} {w:.0%}' for t, w in port.weights.items())}\n\nData: {data_note}\n\n"
-        f"## 1-day VaR / ES (portfolio value {args.value:,.0f})\n\n```\n{_fmt(vt, {})}\n```\n\n"
+        f"## 1-day VaR / ES (portfolio value {args.value:,.0f})\n\n```\n{vt_txt}\n```\n\n"
         f"## GARCH(1,1)\n\nalpha {g.alpha:.3f}, beta {g.beta:.3f}, persistence {g.persistence:.3f}, "
         f"half-life {g.half_life_days:.0f} days\n\n"
         f"GJR-GARCH: alpha {gj.alpha:.3f}, gamma {gj.gamma:.3f}, beta {gj.beta:.3f}; "
         f"AIC {gj.aic:,.1f} vs {g.aic:,.1f} for GARCH\n\n"
-        f"## Backtest, 99% VaR\n\n```\n{_fmt(bt_table, {"expected": "{:.1f}", "kupiec_p": "{:.4f}", "independence_p": "{:.4f}", "cond_coverage_p": "{:.4f}"})}\n```\n\n"
-        f"## ES backtest, 97.5% (Z2)\n\n```\n{_fmt(z_table, {"Z2": "{:.3f}", "expected": "{:.1f}"})}\n```\n\n"
-        f"## Historical stress\n\n```\n{_fmt(hs, {"portfolio_return": "{:.1%}", "max_drawdown_in_window": "{:.1%}"}) if not hs.empty else 'not covered by data'}\n```\n")
+        f"## Backtest, 99% VaR\n\n```\n{bt_txt}\n```\n\n"
+        f"## ES backtest, 97.5% (Z2)\n\n```\n{z_txt}\n```\n\n"
+        f"## Historical stress\n\n```\n{hs_txt}\n```\n")
     vt.round(2).to_csv(REPORTS / "var_table.csv")
     bt_table.to_csv(REPORTS / "backtest.csv")
     print(f"\nCharts and tables saved to {REPORTS}/")
