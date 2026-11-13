@@ -56,6 +56,8 @@ Both results point to the same next step. A univariate model on portfolio return
 
 **Basel traffic light.** Over the last 250 days both FHS models are in the yellow zone (6 and 5 exceptions), while historical simulation is in the green zone (2). This does not contradict the long-run result. Most of those exceptions were sudden one-day drops after calm periods (January, March and June 2026 and 5 November 2026), the case where a volatility-scaled VaR is lowest. Historical VaR still had the −3.9% day of 4 April 2025 in its 250-day window until spring 2026, which kept it high through a quiet year. Under Basel rules a yellow zone raises the capital multiplier. A bank would accept that cost only because the green model fails in a real crisis, as 2008 shows.
 
+**Today's VaR.** The conditional 99% VaR from FHS-GARCH is 29,300 per million, 38% above historical VaR (21,300). The reason is recent volatility. Realised volatility over the last 20 days is 16.8% annualised, against 12.3% over the last 250 days, after moves of −1.5% (30 October), −2.8% (5 November) and +2.0% (9 November). GARCH puts tomorrow's volatility at 17.2%, while historical VaR still averages a year of mostly calm days. If the market stays calm, the gap closes within weeks (the half-life of a volatility shock is about 40 days).
+
 Other numbers from the same run: SPY, QQQ and EFA account for 95% of parametric 99% VaR, while TLT, with a 25% weight, adds less than 1% because of its low correlation with equities. The worst historical scenario is the 2008 Lehman collapse (−27%), closely followed by the 2022 rates shock (−26%), when bonds fell together with equities. Full output: [`reports/summary.md`](reports/summary.md).
 
 ![Risk contribution](reports/risk_contribution.png)
