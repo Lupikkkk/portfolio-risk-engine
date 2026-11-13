@@ -47,9 +47,9 @@ tab1, tab2, tab3, tab4 = st.tabs(["VaR & ES", "Backtest", "Stress tests", "Risk 
 
 with tab1:
     st.dataframe(var_table(pr, rets, port.weights, value).style.format("{:,.0f}"))
-    fig = go.Figure(go.Histogram(x=pr * 100, nbinsx=120, marker_color="#4a5568"))
+    fig = go.Figure(go.Histogram(x=pr * 100, nbinsx=120, marker_color="#A3A3A3"))
     v = np.quantile(pr, 1 - alpha) * 100
-    fig.add_vline(x=v, line_color="#c53030", annotation_text=f"Hist. VaR {alpha:.1%}")
+    fig.add_vline(x=v, line_color="#101828", annotation_text=f"Hist. VaR {alpha:.1%}")
     fig.update_layout(title="Distribution of daily portfolio returns (%)", height=380)
     st.plotly_chart(fig, width="stretch")
 
@@ -62,10 +62,10 @@ with tab2:
                f"vol forecast {g.next_sigma * 252 ** 0.5:.1%} p.a. (long-run {g.long_run_vol * 252 ** 0.5:.1%})")
     fig = go.Figure()
     fig.add_scatter(x=bt.index, y=bt["return"] * 100, mode="lines", name="Return", line=dict(width=0.7))
-    fig.add_scatter(x=bt.index, y=-bt["var"] * 100, mode="lines", name="-VaR", line=dict(color="#c53030"))
+    fig.add_scatter(x=bt.index, y=-bt["var"] * 100, mode="lines", name="-VaR", line=dict(color="#101828"))
     exc = bt[bt["exception"]]
     fig.add_scatter(x=exc.index, y=exc["return"] * 100, mode="markers", name="Exceptions",
-                    marker=dict(color="#c53030", size=5))
+                    marker=dict(color="#101828", size=5))
     fig.update_layout(height=420, yaxis_title="%")
     st.plotly_chart(fig, width="stretch")
     st.dataframe(backtest_report(pr, alpha, 250))
@@ -84,6 +84,6 @@ with tab4:
     cv = port.component_var(alpha)
     st.dataframe(cv.style.format({"weight": "{:.1%}", "marginal_var": "{:,.0f}", "component_var": "{:,.0f}",
                                   "pct_of_total": "{:.1%}"}))
-    fig = go.Figure(go.Bar(x=cv["pct_of_total"] * 100, y=cv.index, orientation="h", marker_color="#2b6cb0"))
+    fig = go.Figure(go.Bar(x=cv["pct_of_total"] * 100, y=cv.index, orientation="h", marker_color="#5B7C99"))
     fig.update_layout(title="% of total VaR", height=350, yaxis=dict(autorange="reversed"))
     st.plotly_chart(fig, width="stretch")

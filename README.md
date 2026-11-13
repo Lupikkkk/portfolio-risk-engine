@@ -2,6 +2,8 @@
 
 # Portfolio Risk Engine
 
+[![tests](https://github.com/Lupikkkk/portfolio-risk-engine/actions/workflows/tests.yml/badge.svg)](https://github.com/Lupikkkk/portfolio-risk-engine/actions/workflows/tests.yml)
+
 A Python engine that measures and validates the market risk of a multi-asset portfolio. It follows the workflow of a bank risk team or an asset manager's risk function:
 
 1. **Measure.** One-day Value-at-Risk with five methods: historical simulation, parametric normal, parametric Student-t (maximum likelihood), Monte Carlo with multivariate t shocks, and **Filtered Historical Simulation on GARCH(1,1) and GJR-GARCH(1,1)**. Expected Shortfall at 97.5%, the FRTB standard.
