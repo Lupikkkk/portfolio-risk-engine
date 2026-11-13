@@ -1,0 +1,4 @@
+,Historical,Parametric (normal),Parametric (Student-t),"Monte Carlo (t, df=5)",FHS-GARCH (conditional)
+VaR 95%,11913.64,12796.38,10959.31,11992.14,18469.69
+VaR 99%,21559.75,18260.01,21507.52,20554.25,30448.03
+ES 97.5%,23923.26,18351.85,23818.09,21414.52,31285.36
