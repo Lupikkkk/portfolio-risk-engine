@@ -20,18 +20,21 @@ def load_prices(
 ) -> pd.DataFrame:
     """Return a DataFrame of adjusted close prices (index = date, columns = tickers).
 
+    ``end`` is inclusive. Fix it to a past trading day to make results reproducible:
+    during market hours the latest bar is still moving.
     If ``csv_path`` is given, prices are read from that file instead of the internet.
     """
     if csv_path is not None:
         prices = pd.read_csv(csv_path, index_col=0, parse_dates=True)
-        return prices[tickers].dropna()
+        return prices.loc[start:end, tickers].dropna()
 
     try:
         import yfinance as yf
     except ImportError as exc:  # pragma: no cover - depends on environment
         raise ImportError("Install yfinance (`pip install yfinance`) or pass csv_path=...") from exc
 
-    raw = yf.download(tickers, start=start, end=end, auto_adjust=True, progress=False)
+    end_excl = None if end is None else (pd.Timestamp(end) + pd.Timedelta(days=1)).strftime("%Y-%m-%d")
+    raw = yf.download(tickers, start=start, end=end_excl, auto_adjust=True, progress=False)
     prices = raw["Close"] if isinstance(raw.columns, pd.MultiIndex) else raw[["Close"]]
     if isinstance(prices, pd.Series):
         prices = prices.to_frame(tickers[0])

@@ -1,6 +1,6 @@
-,exceptions,expected,kupiec_p,independence_p,cond_coverage_p,last_250_exceptions,basel_zone
-historical,71,47.5,0.0014,0.0001,0.0,2,green
-normal,104,47.5,0.0,0.0,0.0,5,yellow
-t,74,47.5,0.0004,0.0,0.0,2,green
-fhs_garch,59,47.5,0.1064,0.0065,0.0067,6,yellow
-fhs_gjr,63,47.5,0.0315,0.0616,0.0172,5,yellow
+,exceptions,expected,exceptions_2008,kupiec_p,independence_p,cond_coverage_p,last_250_exceptions,basel_zone
+historical,71,47.5,13,0.0014,0.0001,0.0,2,green
+normal,104,47.5,16,0.0,0.0,0.0,5,yellow
+t,74,47.5,12,0.0004,0.0,0.0,2,green
+fhs_garch,59,47.5,4,0.1061,0.0065,0.0066,6,yellow
+fhs_gjr,63,47.5,6,0.0313,0.0616,0.0172,5,yellow

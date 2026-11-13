@@ -46,6 +46,7 @@ def main() -> None:
     p.add_argument("--tickers", nargs="+", default=["SPY", "TLT", "GLD", "EFA", "QQQ"])
     p.add_argument("--weights", nargs="+", type=float, default=None)
     p.add_argument("--start", default="2005-01-01")
+    p.add_argument("--end", default=None, help="Last day, inclusive (default: latest available)")
     p.add_argument("--value", type=float, default=1_000_000)
     p.add_argument("--csv", default=None, help="Local CSV of prices instead of downloading")
     p.add_argument("--demo", action="store_true", help="Use simulated data (offline)")
@@ -55,7 +56,7 @@ def main() -> None:
         prices = simulate_prices(args.tickers, n_days=2500)
         print("NOTE: using SIMULATED prices (demo mode).\n")
     else:
-        prices = load_prices(args.tickers, start=args.start, csv_path=args.csv)
+        prices = load_prices(args.tickers, start=args.start, end=args.end, csv_path=args.csv)
 
     rets = to_returns(prices)
     weights = (
@@ -166,7 +167,8 @@ def main() -> None:
     oos = runs["historical"].index
     lr_gjr = 2 * (gj.loglik - g.loglik)
     last250 = oos[-250:]
-    exc_rows = [{"date": d.date(), "method": m, "return": r.loc[d, "return"], "var": r.loc[d, "var"]}
+    exc_rows = [{"date": d.date(), "method": m, "return_pct": 100 * r.loc[d, "return"],
+                 "var_pct": 100 * r.loc[d, "var"]}
                 for m, r in runs.items() for d in r.index[r["exception"]]]
     exceptions = pd.DataFrame(exc_rows).sort_values(["method", "date"])
     last_exc = "\n".join(
@@ -208,7 +210,7 @@ def main() -> None:
         f"Daily moves of 1.5% or more in the last 20 days: "
         f"{', '.join(f'{d.date()} {r:+.2%}' for d, r in big.items()) or 'none'}.\n\n"
         f"## Historical stress\n\n```\n{hs_txt}\n```\n")
-    exceptions.to_csv(REPORTS / "exceptions.csv", index=False, float_format="%.6f")
+    exceptions.to_csv(REPORTS / "exceptions.csv", index=False, float_format="%.2f")
     cv.to_csv(REPORTS / "risk_contribution.csv")
     vt.round(2).to_csv(REPORTS / "var_table.csv")
     bt_table.to_csv(REPORTS / "backtest.csv")
