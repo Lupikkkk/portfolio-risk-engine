@@ -129,14 +129,14 @@ def main() -> None:
         "axes.titlelocation": "left", "grid.color": stone, "grid.alpha": 0.25, "grid.linewidth": 0.6,
     })
 
-    fhs = rolling_fhs(pr, 0.99, 750)
+    fhs = rolling_fhs(pr, 0.99, 750, model="gjr")  # best model in the backtest
     bt = rolling_var(pr, 0.99, 250, "historical").loc[fhs.index[0]:]
     fig, ax = plt.subplots(figsize=(11, 4.5))
     ax.plot(bt.index, bt["return"] * 100, lw=0.5, color=stone, label="Daily return")
     ax.plot(bt.index, -bt["var"] * 100, lw=1.3, color=navy,
             label=f"VaR 99%, historical ({int(bt['exception'].sum())} exceptions)")
     ax.plot(fhs.index, -fhs["var"] * 100, lw=1.0, color=steel,
-            label=f"VaR 99%, FHS-GARCH ({int(fhs['exception'].sum())} exceptions)")
+            label=f"VaR 99%, FHS-GJR-GARCH ({int(fhs['exception'].sum())} exceptions)")
     exc = bt[bt["exception"]]
     ax.scatter(exc.index, exc["return"] * 100, color=navy, s=10, zorder=3, linewidths=0)
     ax.set_ylabel("Daily return, %")
