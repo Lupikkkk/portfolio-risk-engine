@@ -124,6 +124,7 @@ def backtest_report(returns: pd.Series, alpha: float = 0.99, window: int = 250,
     runs = {m: rolling_var(returns, alpha, window, m) for m in ("historical", "normal", "t")}
     if include_fhs and len(returns.dropna()) > fhs_window + 250:
         runs["fhs_garch"] = rolling_fhs(returns, alpha, fhs_window)
+        runs["fhs_gjr"] = rolling_fhs(returns, alpha, fhs_window, model="gjr")
         start = runs["fhs_garch"].index[0]
         runs = {m: bt.loc[start:] for m, bt in runs.items()}
     rows = {}

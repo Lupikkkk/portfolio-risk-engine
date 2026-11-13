@@ -20,6 +20,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from scipy.stats import chi2
 
 from risk_engine import Portfolio, load_prices, simulate_prices, to_returns
 from risk_engine.backtest import backtest_report, es_backtest_z2, rolling_var
@@ -77,9 +78,14 @@ def main() -> None:
           f"shock half-life {g.half_life_days:.0f} days")
     print(f"long-run vol {g.long_run_vol * 252 ** 0.5:.1%} p.a. | forecast for tomorrow "
           f"{g.next_sigma * 252 ** 0.5:.1%} p.a.")
+    gj = fit_garch(pr, "gjr")
+    print("\n=== GJR-GARCH(1,1): negative shocks add gamma * e^2 to tomorrow's variance ===")
+    print(f"alpha {gj.alpha:.3f} | gamma {gj.gamma:.3f} | beta {gj.beta:.3f} | persistence {gj.persistence:.3f}")
+    print(f"AIC {gj.aic:,.1f} vs GARCH {g.aic:,.1f} | BIC {gj.bic:,.1f} vs GARCH {g.bic:,.1f} "
+          f"| LR = {2 * (gj.loglik - g.loglik):.1f} (5% critical value {chi2.ppf(0.95, 1):.2f})")
 
     print("\n=== Backtest 99% VaR, same out-of-sample period for all methods ===")
-    print("(historical / normal / t: 250-day window; FHS-GARCH: 750-day window, refit every 20 days)")
+    print("(historical / normal / t: 250-day window; FHS-GARCH / FHS-GJR: 750-day window, refit every 20 days)")
     bt_table = backtest_report(pr, 0.99, 250)
     print(bt_table)
 
@@ -89,7 +95,10 @@ def main() -> None:
     hs_es = pr.rolling(250).apply(lambda x: -x[x <= np.quantile(x, 0.025)].mean(), raw=True).shift(1)
     z_hs = es_backtest_z2(hs975["return"], hs975["var"], hs_es.loc[hs975.index], 0.975)
     z_fhs = es_backtest_z2(fhs975["return"], fhs975["var"], fhs975["es"], 0.975)
-    print(pd.DataFrame({"historical": z_hs, "fhs_garch": z_fhs}).T)
+    gjr975 = rolling_fhs(pr, 0.975, 750, model="gjr")
+    z_gjr = es_backtest_z2(gjr975["return"], gjr975["var"], gjr975["es"], 0.975)
+    z_table = pd.DataFrame({"historical": z_hs, "fhs_garch": z_fhs, "fhs_gjr": z_gjr}).T
+    print(z_table)
 
     print("\n=== Historical stress scenarios ===")
     hs = run_historical_stress(rets, port.weights, args.value)
@@ -148,8 +157,10 @@ def main() -> None:
         f"## 1-day VaR / ES (portfolio value {args.value:,.0f})\n\n```\n{vt.round(0).to_string()}\n```\n\n"
         f"## GARCH(1,1)\n\nalpha {g.alpha:.3f}, beta {g.beta:.3f}, persistence {g.persistence:.3f}, "
         f"half-life {g.half_life_days:.0f} days\n\n"
+        f"GJR-GARCH: alpha {gj.alpha:.3f}, gamma {gj.gamma:.3f}, beta {gj.beta:.3f}; "
+        f"AIC {gj.aic:,.1f} vs {g.aic:,.1f} for GARCH\n\n"
         f"## Backtest, 99% VaR\n\n```\n{bt_table.to_string()}\n```\n\n"
-        f"## ES backtest, 97.5% (Z2)\n\n```\n{pd.DataFrame({'historical': z_hs, 'fhs_garch': z_fhs}).T.to_string()}\n```\n\n"
+        f"## ES backtest, 97.5% (Z2)\n\n```\n{z_table.to_string()}\n```\n\n"
         f"## Historical stress\n\n```\n{hs.to_string() if not hs.empty else 'not covered by data'}\n```\n")
     vt.round(2).to_csv(REPORTS / "var_table.csv")
     bt_table.to_csv(REPORTS / "backtest.csv")

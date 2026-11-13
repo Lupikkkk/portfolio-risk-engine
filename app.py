@@ -54,8 +54,9 @@ with tab1:
     st.plotly_chart(fig, width="stretch")
 
 with tab2:
-    method = st.radio("Method", ["historical", "normal", "t", "fhs_garch"], horizontal=True)
-    bt = rolling_fhs(pr, alpha, 750) if method == "fhs_garch" else rolling_var(pr, alpha, 250, method)
+    method = st.radio("Method", ["historical", "normal", "t", "fhs_garch", "fhs_gjr"], horizontal=True)
+    bt = (rolling_fhs(pr, alpha, 750, model="gjr" if method == "fhs_gjr" else "garch")
+          if method.startswith("fhs") else rolling_var(pr, alpha, 250, method))
     g = fit_garch(pr)
     st.caption(f"GARCH(1,1): alpha {g.alpha:.3f}, beta {g.beta:.3f}, persistence {g.persistence:.3f}, "
                f"vol forecast {g.next_sigma * 252 ** 0.5:.1%} p.a. (long-run {g.long_run_vol * 252 ** 0.5:.1%})")

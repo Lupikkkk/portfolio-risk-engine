@@ -163,3 +163,31 @@ def test_portfolio_rejects_zero_net_weights(data):
     rets, _ = data
     with pytest.raises(ValueError):
         Portfolio(rets, pd.Series([1.0, -1.0, 0.0], index=["A", "B", "C"]))
+
+
+def _simulate_gjr(n, omega, alpha, beta, gamma, seed=0):
+    rng = np.random.default_rng(seed)
+    r = np.empty(n)
+    s2 = omega / (1 - alpha - beta - gamma / 2)
+    for t in range(n):
+        r[t] = np.sqrt(s2) * rng.standard_normal()
+        s2 = omega + (alpha + gamma * (r[t] < 0)) * r[t] ** 2 + beta * s2
+    return pd.Series(r)
+
+
+def test_gjr_recovers_leverage_effect():
+    from risk_engine import fit_garch
+    r = _simulate_gjr(20_000, 2e-6, 0.03, 0.87, 0.12, seed=12)
+    fit = fit_garch(r, "gjr")
+    assert fit.gamma == pytest.approx(0.12, abs=0.03)
+    assert fit.alpha == pytest.approx(0.03, abs=0.02)
+    assert fit.beta == pytest.approx(0.87, abs=0.03)
+    assert fit.aic < fit_garch(r, "garch").aic  # the extra parameter is worth it
+
+
+def test_gjr_finds_no_leverage_in_symmetric_data():
+    from risk_engine import fit_garch
+    r = _simulate_garch(20_000, 2e-6, 0.10, 0.85, seed=13)
+    fit, plain = fit_garch(r, "gjr"), fit_garch(r, "garch")
+    assert fit.gamma < 0.03
+    assert fit.loglik >= plain.loglik - 1e-6  # nested model can never fit worse
