@@ -19,7 +19,7 @@ with st.sidebar:
     tickers = st.text_input("Tickers (space-separated)", "SPY TLT GLD EFA QQQ").split()
     raw_w = st.text_input("Weights (blank = equal)", "0.35 0.25 0.10 0.15 0.15")
     value = st.number_input("Portfolio value", value=1_000_000, step=100_000)
-    start = st.date_input("Start date", pd.Timestamp("2007-01-01"))
+    start = st.date_input("Start date", pd.Timestamp("2005-01-01"))
     demo = st.checkbox("Use simulated data (offline)", value=False)
     alpha = st.select_slider("Confidence", options=[0.95, 0.975, 0.99], value=0.99)
 
